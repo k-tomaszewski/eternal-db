@@ -20,9 +20,11 @@ NOTE: This project is a work-in-progress.
 4. Strict schema validation for data is not a goal.
 5. Strict transactions support is not a goal.
 6. Data access control is not a goal. A user is responsible to configure desired access rights to a directory defined for data files.
+7. Valid use of a single database storage from many database instances is not a goal.
 
 ## Design decisions
 1. Project is developed in Java 21.
 2. Records are kept formated as single line JSON, thus a single data file has JSON Lines format: https://jsonlines.org/
 3. Data are persisted as a disk files in directory tree that is representing periods of time.
 4. Project is avoiding unnecessary dependencies. No Vavr, Project Reactor, Guava, etc.
+5. The database should be easy to use in Spring Boot based application.

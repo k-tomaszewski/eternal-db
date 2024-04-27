@@ -1,7 +1,8 @@
 # eternal-db
-Eternal DB is an embedded time series data base/data store with data retention policy based on a disk space, thus allowing to collect data eternally.
+Eternal DB is an embedded time series database/data store with a data retention policy based on a disk space, 
+thus allowing to collect data eternally.
 
-NOTE: This project is a work-in-progress.
+NOTE: This project is a work-in-progress (WIP).
 
 ## Project goals
 1. It is an embedded database (data store) that is easy to add to a Java-based program.

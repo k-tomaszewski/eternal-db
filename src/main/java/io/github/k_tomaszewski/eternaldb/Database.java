@@ -1,5 +1,6 @@
 package io.github.k_tomaszewski.eternaldb;
 
+import io.github.k_tomaszewski.util.StreamUtil;
 import org.apache.commons.lang3.Validate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -7,33 +8,24 @@ import org.slf4j.LoggerFactory;
 import java.io.BufferedWriter;
 import java.io.Closeable;
 import java.io.IOException;
-import java.io.Writer;
 import java.nio.file.FileStore;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.DoubleAdder;
-import java.util.function.BiConsumer;
 import java.util.function.IntUnaryOperator;
-import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
-import static java.lang.Integer.parseInt;
-
-
-public class Database implements Closeable {
+public class Database<T> implements Closeable {
 
     private static final Logger LOG = LoggerFactory.getLogger(Database.class);
-    private static final DateTimeFormatter FILENAME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH");
-    private static final Pattern FILENAME_REGEX = Pattern.compile("(\\d{4})-(\\d{2})-(\\d{2})_(\\d{2})(\\d{2})");
     private static final int WRITES_TO_CHECK_DISK_USAGE = 10;
     private static final int DEFAULT_BLOCK_SIZE = 4096;
+    private static final int TIMESTAMP_RADIX = 32;
 
     private final Path dataDir;
 
@@ -46,18 +38,18 @@ public class Database implements Closeable {
     // bytes
     private final long diskBlockSize;
 
-    // must serialize Object to text without using new line sequence and append it to Writer
-    private final BiConsumer<Object, Writer> recordSerializer;
-
     private final ConcurrentMap<String, FileContext> fileWriters = new ConcurrentHashMap<>();
     private final IntUnaryOperator diskUsageCheckDelayFunction = (n) -> (n > 0) ? --n : WRITES_TO_CHECK_DISK_USAGE;
     private final AtomicReference<DiskSpaceReclaimer> diskSpaceReclaimerRef = new AtomicReference<>();
+    private final FileNamingStrategy fileNaming;
+    private final SerializationStrategy serialization;
 
 
-    public Database(Path dataDir, long diskUsageLimit, BiConsumer<Object, Writer> recordSerializer) {
+    public Database(Path dataDir, long diskUsageLimit, SerializationStrategy serialization, FileNamingStrategy fileNaming) {
         this.dataDir = validate(dataDir);
         this.diskUsageLimit = diskUsageLimit;
-        this.recordSerializer = recordSerializer;
+        this.fileNaming = fileNaming;
+        this.serialization = serialization;
         diskUsageActual.add(DiskUsageUtil.getDiskUsageMB(dataDir.toString()));
         var fileStoreOpt = getFileStore();
         diskBlockSize = getBlockSize(fileStoreOpt);
@@ -67,33 +59,34 @@ public class Database implements Closeable {
                 diskBlockSize);
     }
 
-    private long getBlockSize(Optional<FileStore> fileStore) {
-        try {
-            return fileStore.orElseThrow().getBlockSize();
-        } catch (Exception e) {
-            LOG.warn("Cannot establish disk block size: {}. Assuming default of {}.", e.getMessage(),
-                    DEFAULT_BLOCK_SIZE);
-            return DEFAULT_BLOCK_SIZE;
-        }
-    }
-
     public double getActualDiskUsageMB() {
         return diskUsageActual.doubleValue();
     }
 
-    public void write(Object record, long recordMillis) {
+    public void write(T record, long recordMillis) {
         try {
             FileContext context = getFileContext(recordMillis);
             synchronized (context) {
                 BufferedWriter fileWriter = context.getFileWriter();
-                fileWriter.append(Long.toString(recordMillis - context.getStartMills())).append('\t');
-                recordSerializer.accept(record, fileWriter);
+                fileWriter.append(Long.toString(recordMillis, TIMESTAMP_RADIX)).append('\t');
+                serialization.serialize(record, fileWriter);
                 fileWriter.newLine();
 
-                onDiskUsageChange(context.calculateFileGrowthMB());
+                onDiskUsageChange(context.calculateFileGrowthMB());     // TODO should this stay inside synchronized?
             }
         } catch (Exception e) {
             throw new RuntimeException("Database write failed", e);
+        }
+    }
+
+    public <U> Stream<Timestamped<U>> read(Class<U> type, Long minMillis, Long maxMillis) {
+        try {
+            var lineStream = StreamUtil.stream(new FileLinesSpliterator(dataDir, minMillis, maxMillis, fileNaming), false);
+            return filter(lineStream, minMillis, maxMillis)
+                    .map(line -> readRecordLine(line, type))
+                    .filter(Objects::nonNull);
+        } catch (IOException e) {
+            throw new RuntimeException("Database read failed", e);
         }
     }
 
@@ -110,8 +103,29 @@ public class Database implements Closeable {
         });
     }
 
+    private static Stream<String> filter(Stream<String> lineStream, Long minMillis, Long maxMillis) {
+        if (minMillis != null || maxMillis != null) {
+            lineStream = lineStream.filter(line -> {
+                long recordMillis = Long.parseLong(line, 0, line.indexOf('\t'), TIMESTAMP_RADIX);
+                return (minMillis == null || minMillis <= recordMillis) && (maxMillis == null || maxMillis >= recordMillis);
+            });
+        }
+        return lineStream;
+    }
+
+    private <U> Timestamped<U> readRecordLine(String line, Class<U> type) {
+        try {
+            int tabPos = line.indexOf('\t');
+            return new Timestamped<>(serialization.deserialize(line.substring(tabPos + 1), type),
+                    Long.parseLong(line, 0, tabPos, TIMESTAMP_RADIX));
+        } catch (RuntimeException e) {
+            LOG.warn("Record reading failed", e);
+            return null;
+        }
+    }
+
     /**
-     * TODO: Here is a good place to use a strategy for deciding when perform deleting old data files.
+     * TODO: Here is a good place to use a strategy for deciding when to perform deleting old data files.
      */
     private void onDiskUsageChange(double change) {
         if (change != 0.0) {
@@ -126,7 +140,16 @@ public class Database implements Closeable {
         }
     }
 
-    // returns minimal free disk space in megabytes
+    private static long getBlockSize(Optional<FileStore> fileStore) {
+        try {
+            return fileStore.orElseThrow().getBlockSize();
+        } catch (Exception e) {
+            LOG.warn("Cannot establish disk block size: {}. Assuming default of {}.", e.getMessage(), DEFAULT_BLOCK_SIZE);
+            return DEFAULT_BLOCK_SIZE;
+        }
+    }
+
+    // returns minimal disk space in megabytes, that we try to keep free
     private double getMinDiskSpace() {
         if (diskUsageLimit <= 10) {
             return 10.0 * diskBlockSize / (1024.0 * 1024.0);
@@ -141,29 +164,8 @@ public class Database implements Closeable {
         return (existing != null) ? existing : new DiskSpaceReclaimer(dataDir, minDiskSpace);
     }
 
-    static String relativePathStr(long recordMillis) {
-        LocalDateTime dateTime = LocalDateTime.ofEpochSecond(recordMillis / 1000, 1000 * (int) (recordMillis % 1000),
-                ZoneOffset.UTC);
-        return dateTime.getYear() + "/" + dateTime.format(FILENAME_FORMATTER) + "00.data";
-    }
-
-    static long parseMillisFromName(String fileName) {
-        var matcher = FILENAME_REGEX.matcher(fileName);
-        if (matcher.find()) {
-            try {
-                return LocalDateTime.of(parseInt(matcher.group(1)), parseInt(matcher.group(2)),
-                        parseInt(matcher.group(3)), parseInt(matcher.group(4)), parseInt(matcher.group(5)))
-                        .toInstant(ZoneOffset.UTC)
-                        .toEpochMilli();
-            } catch (Exception e) {
-                throw new IllegalArgumentException("Path %s doesn't contain date".formatted(fileName), e);
-            }
-        }
-        throw new IllegalArgumentException("Path %s doesn't match to pattern".formatted(fileName));
-    }
-
     private FileContext getFileContext(long recordMillis) {
-        return fileWriters.compute(relativePathStr(recordMillis), (relativeFilePath, context) -> {
+        return fileWriters.compute(fileNaming.formatRelativePathStr(recordMillis), (relativeFilePath, context) -> {
             if (context == null) {
                 context = createFileContext(relativeFilePath);
             }
@@ -173,19 +175,15 @@ public class Database implements Closeable {
 
     private FileContext createFileContext(String relativeFilePath) {
         Path dataFilePath = dataDir.resolve(relativeFilePath);
-        long startMillis = parseMillisFromName(dataFilePath.getFileName().toString());
         try {
-            long fileSize = 0;
-            if (Files.exists(dataFilePath)) {
-                fileSize = Files.size(dataFilePath);
-            } else {
+            if (!Files.exists(dataFilePath)) {
                 Path parentDir = dataFilePath.getParent();
                 if (!Files.exists(parentDir)) {
                     LOG.info("Creating data subdirectory {}...", parentDir);
                     Files.createDirectories(parentDir);
                 }
             }
-            return new FileContext(dataFilePath, startMillis, diskUsageCheckDelayFunction);
+            return new FileContext(dataFilePath, diskUsageCheckDelayFunction);
         } catch (IOException e) {
             throw new RuntimeException("Cannot open data file %s".formatted(dataFilePath), e);
         }
@@ -196,7 +194,7 @@ public class Database implements Closeable {
         if (!Files.exists(dir)) {
             LOG.info("Data directory '{}' doesn't exist. Creating...", dir);
             try {
-                dir = Files.createDirectories(dir);
+                Files.createDirectories(dir);
             } catch (IOException e) {
                 throw new RuntimeException("Cannot create data directory: %s".formatted(dir), e);
             }

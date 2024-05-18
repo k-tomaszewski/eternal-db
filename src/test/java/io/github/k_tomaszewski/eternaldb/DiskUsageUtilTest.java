@@ -14,8 +14,7 @@ public class DiskUsageUtilTest {
         final float diskUsageMB = DiskUsageUtil.getDiskUsageMB(".");
 
         final long endMillis = System.currentTimeMillis();
-        System.out.format("Current directory disk usage: %f MB. Executed in %d ms.", diskUsageMB,
-                endMillis - startMillis);
+        System.out.format("Current directory disk usage: %f MB. Executed in %d ms.\n", diskUsageMB, endMillis - startMillis);
 
         // then
         Assertions.assertTrue(diskUsageMB > 0.01f);
@@ -30,8 +29,7 @@ public class DiskUsageUtilTest {
         final float diskUsageMB = DiskUsageUtil.getDiskUsageMB("pom.xml");
 
         final long endMillis = System.currentTimeMillis();
-        System.out.format("pom.xml disk usage: %f MB. Executed in %d ms.", diskUsageMB,
-                endMillis - startMillis);
+        System.out.format("Disk usage of 'pom.xml' file: %f MB. Executed in %d ms.\n", diskUsageMB, endMillis - startMillis);
 
         // then
         Assertions.assertTrue(diskUsageMB > 0.003f);

@@ -4,25 +4,11 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 public class DatabaseTest {
-
-    @Test
-    void shouldFormatDataFileNames() {
-        Assertions.assertEquals("1970/1970-01-01_0000.data", Database.relativePathStr(0));
-        Assertions.assertEquals("2024/2024-03-15_1200.data", Database.relativePathStr(
-                LocalDateTime.of(2024, 3, 15, 12, 11, 56).toInstant(ZoneOffset.UTC).toEpochMilli()));
-    }
-
-    @Test
-    void shouldGetMillisFromFilename() {
-        Assertions.assertEquals(0L, Database.parseMillisFromName("1970-01-01_0000.data"));
-        Assertions.assertEquals(LocalDateTime.of(2024, 3, 15, 12, 0).toInstant(ZoneOffset.UTC).toEpochMilli(),
-                Database.parseMillisFromName("2024-03-15_1200.data"));
-    }
 
     @Test
     void shouldCreateDatabase() {
@@ -30,7 +16,7 @@ public class DatabaseTest {
         final Path dataDir = Path.of("target/test_db");
 
         // when
-        Database db = new Database(dataDir, 1, (record, writer) -> {});
+        Database<Object> db = new Database<>(dataDir, 1, new JacksonSerialization(), new BasicFileNaming());
         db.close();
 
         // then no exception
@@ -40,13 +26,36 @@ public class DatabaseTest {
     void shouldWriteRecordToDatabase() {
         // given
         final Path dataDir = Path.of("target/test_db_2");
-        var serializer = new JacksonSerializer();
-        Database db = new Database(dataDir, 1, serializer);
+        Database<Object> db = new Database<>(dataDir, 1, new JacksonSerialization(), new BasicFileNaming());
 
         // when
         db.write(Map.of("foo", "bar"), System.currentTimeMillis());
         db.close();
 
         // then no exception
+    }
+
+    @Test
+    void shouldReadWrittenRecord() {
+        // given
+        final Path dataDir = Path.of("target/test_db_" + UUID.randomUUID());
+        Database<Object> db = new Database<>(dataDir, 1, new JacksonSerialization(), new BasicFileNaming());
+
+        final var obj1 = new TestEntity(123, "abc");
+        final var obj2 = new TestEntity(456, "XYZ");
+
+        // when
+        db.write(obj1, System.currentTimeMillis());
+        db.write(obj2, System.currentTimeMillis());
+        List<TestEntity> entities = db.read(TestEntity.class, null, null).map(Timestamped::record).toList();
+        db.close();
+
+        // then
+        Assertions.assertEquals(2, entities.size());
+        Assertions.assertEquals(obj1, entities.getFirst());
+        Assertions.assertEquals(obj2, entities.getLast());
+    }
+
+    record TestEntity (int number, String text) {
     }
 }

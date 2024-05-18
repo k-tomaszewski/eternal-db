@@ -19,16 +19,14 @@ class FileContext {
 
     private final Path path;
     private final BufferedWriter fileWriter;
-    private final long startMills;
     private final IntUnaryOperator diskUsageCheckDelayFunction;
     private long lastUseMillis;
     private long lastDiskUsageKB;
     private int timesToDiskUsageCheck;
 
-    FileContext(Path path, long startMills, IntUnaryOperator diskUsageCheckDelayFunction) throws IOException {
+    FileContext(Path path, IntUnaryOperator diskUsageCheckDelayFunction) throws IOException {
         this.path = path;
         this.fileWriter = Files.newBufferedWriter(path, UTF_8, APPEND, CREATE);
-        this.startMills = startMills;
         this.diskUsageCheckDelayFunction = diskUsageCheckDelayFunction;
         lastUseMillis = System.currentTimeMillis();
         lastDiskUsageKB = DiskUsageUtil.getDiskUsageKB(path.toString());
@@ -38,10 +36,6 @@ class FileContext {
 
     BufferedWriter getFileWriter() {
         return fileWriter;
-    }
-
-    long getStartMills() {
-        return startMills;
     }
 
     double calculateFileGrowthMB() {

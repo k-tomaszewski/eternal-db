@@ -19,14 +19,13 @@ import static io.github.k_tomaszewski.util.StreamUtil.closeSafely;
 /**
  * Serves as a base for a stream of raw lines from data files. Files are limited by optional `minMillis` and `maxMillis`, but records
  * provided by this spliterator ARE NOT LIMITED. All records from selected files are provided.
+ * NOTE: This is a closeable spliterator. Use {@link io.github.k_tomaszewski.util.StreamUtil#stream(Spliterator, boolean)} to create
+ * a Stream object that will close this spliterator. Otherwise, it won't be closed. See: https://bugs.openjdk.org/browse/JDK-8318856
  */
 class FileLinesSpliterator implements Spliterator<String>, AutoCloseable {
 
     private static final Logger LOG = LoggerFactory.getLogger(FileLinesSpliterator.class);
     private static final BiPredicate<Path, BasicFileAttributes> DATA_FILE_PREDICATE = (path, attributes) -> attributes.isRegularFile();
-
-    // TODO opcjonalne ograniczenia OD i DO
-    // TODO bieżący kontekst
 
     final Path dataDir;
     final Stream<Path> pathStream;
@@ -34,7 +33,6 @@ class FileLinesSpliterator implements Spliterator<String>, AutoCloseable {
     final FileNamingStrategy fileNamingStrategy;
     volatile Stream<String> fileLineStream;
     volatile Spliterator<String> fileLineSpliterator;
-
 
     public FileLinesSpliterator(Path dataDir, Long minMillis, Long maxMillis, FileNamingStrategy fileNamingStrategy) throws IOException {
         this.dataDir = dataDir;

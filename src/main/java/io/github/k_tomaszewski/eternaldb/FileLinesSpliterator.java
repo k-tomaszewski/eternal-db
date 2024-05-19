@@ -84,9 +84,7 @@ class FileLinesSpliterator implements Spliterator<String>, AutoCloseable {
             fileLineSpliterator = fileLineStream.sorted().spliterator();
         } catch (IOException e) {
             LOG.warn("Cannot read data from file {}", path, e);
-            closeSafely(fileLineStream);
-            fileLineStream = null;
-            fileLineSpliterator = null;
+            closeDataFile();
         }
     }
 

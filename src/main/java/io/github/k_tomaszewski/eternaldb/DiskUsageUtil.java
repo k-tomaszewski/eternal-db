@@ -10,29 +10,30 @@ public class DiskUsageUtil {
 	}
 
 	/**
-	 * Disk usage for given directory in kilobytes.
+	 * Disk usage for given directory in kilobytes. This calls `du` command (coreutils). See:
+	 * https://www.gnu.org/software/coreutils/manual/html_node/du-invocation.html
 	 */
-	public static long getDiskUsageKB(String dir) {
+	public static long getDiskUsageKB(String path) {
 		try {
-			Process process = Runtime.getRuntime().exec(new String[]{"du", "-sk", dir});		// size in KB
+			Process process = Runtime.getRuntime().exec(new String[]{"du", "-sk", path});		// size in KB
 			process.waitFor();
 			try (var processStdOut = process.inputReader()) {
 				return processStdOut.lines()
-						.filter(line -> line.endsWith(dir))
+						.filter(line -> line.endsWith(path))
 						.mapToLong(DiskUsageUtil::extractNumber)
 						.findFirst()
 						.orElseThrow();
 			}
 		} catch (Exception e) {
-			throw new RuntimeException("Getting disk usage of '%s' failed.".formatted(dir), e);
+			throw new RuntimeException("Getting disk usage of '%s' failed.".formatted(path), e);
 		}
 	}
 	
 	private static long extractNumber(String duOutput) {
-		int mPos = duOutput.indexOf('\t');
-		if (mPos > 0) {
-			return Long.parseLong(duOutput.substring(0, mPos));
+		int tabPos = duOutput.indexOf('\t');
+		if (tabPos > 0) {
+			return Long.parseLong(duOutput.substring(0, tabPos));
 		}
-		throw new RuntimeException("Unexpected output from 'du' command.");
+		throw new RuntimeException("Unexpected output from 'du' command: " + duOutput);
 	}
 }

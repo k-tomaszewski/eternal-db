@@ -28,13 +28,13 @@ class FileContext {
         this.path = path;
         this.fileWriter = Files.newBufferedWriter(path, UTF_8, APPEND, CREATE);
         this.diskUsageCheckDelayFunction = diskUsageCheckDelayFunction;
-        lastUseMillis = System.currentTimeMillis();
         lastDiskUsageKB = DiskUsageUtil.getDiskUsageKB(path.toString());
         timesToDiskUsageCheck = diskUsageCheckDelayFunction.applyAsInt(0);
-        LOG.trace("File {} opened with initial disk usage of {} KB", path, lastDiskUsageKB);
+        LOG.trace("File {} opened with initial disk usage: {} KB", path, lastDiskUsageKB);
     }
 
     BufferedWriter getFileWriter() {
+        lastUseMillis = System.currentTimeMillis();
         return fileWriter;
     }
 
@@ -42,9 +42,10 @@ class FileContext {
         timesToDiskUsageCheck = diskUsageCheckDelayFunction.applyAsInt(timesToDiskUsageCheck);
         if (timesToDiskUsageCheck == 0) {
             long currentDiskUsageKB = DiskUsageUtil.getDiskUsageKB(path.toString());
-            double growth = (currentDiskUsageKB - lastDiskUsageKB) / 1024.0;
+            LOG.trace("File {} current disk usage: {} KB", path, currentDiskUsageKB);
+            double growthMB = (currentDiskUsageKB - lastDiskUsageKB) / 1024.0;
             lastDiskUsageKB = currentDiskUsageKB;
-            return growth;
+            return growthMB;
         }
         return 0.0;
     }

@@ -15,7 +15,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.DoubleAdder;
 import java.util.function.IntUnaryOperator;
 import java.util.stream.Stream;
@@ -40,7 +40,7 @@ public class Database<T> implements Closeable {
 
     private final ConcurrentMap<String, FileContext> fileWriters = new ConcurrentHashMap<>();
     private final IntUnaryOperator diskUsageCheckDelayFunction = (n) -> (n > 0) ? --n : WRITES_TO_CHECK_DISK_USAGE;
-    private final AtomicReference<DiskSpaceReclaimer> diskSpaceReclaimerRef = new AtomicReference<>();
+    private final AtomicBoolean diskSpaceReclaiming = new AtomicBoolean(false);
     private final FileNamingStrategy fileNaming;
     private final SerializationStrategy serialization;
 
@@ -64,6 +64,7 @@ public class Database<T> implements Closeable {
     }
 
     public void write(T record, long recordMillis) {
+        double fileGrowthMB;
         try {
             FileContext context = getFileContext(recordMillis);
             synchronized (context) {
@@ -71,12 +72,12 @@ public class Database<T> implements Closeable {
                 fileWriter.append(Long.toString(recordMillis, TIMESTAMP_RADIX)).append('\t');
                 serialization.serialize(record, fileWriter);
                 fileWriter.newLine();
-
-                onDiskUsageChange(context.calculateFileGrowthMB());     // TODO should this stay inside synchronized?
+                fileGrowthMB = context.calculateFileGrowthMB();
             }
         } catch (Exception e) {
             throw new RuntimeException("Database write failed", e);
         }
+        onDiskUsageChange(fileGrowthMB);
     }
 
     public <U> Stream<Timestamped<U>> read(Class<U> type, Long minMillis, Long maxMillis) {
@@ -86,7 +87,7 @@ public class Database<T> implements Closeable {
                     .map(line -> readRecordLine(line, type))
                     .filter(Objects::nonNull);
         } catch (IOException e) {
-            throw new RuntimeException("Database read failed", e);
+            throw new RuntimeException("Database read failed.", e);
         }
     }
 
@@ -119,23 +120,36 @@ public class Database<T> implements Closeable {
             return new Timestamped<>(serialization.deserialize(line.substring(tabPos + 1), type),
                     Long.parseLong(line, 0, tabPos, TIMESTAMP_RADIX));
         } catch (RuntimeException e) {
-            LOG.warn("Record reading failed", e);
+            LOG.warn("Record reading failed.", e);
             return null;
         }
     }
 
     /**
      * TODO: Here is a good place to use a strategy for deciding when to perform deleting old data files.
+     * TODO: Disk space to reclaim could be adjusted by last dynamics of data writing.
      */
     private void onDiskUsageChange(double change) {
         if (change != 0.0) {
-            diskUsageActual.add(change);
-
-            final double leftDiskSpace = diskUsageLimit - diskUsageActual.sum();
-            final double minDiskSpace = getMinDiskSpace();
-            if (leftDiskSpace < minDiskSpace) {
-                LOG.info("Left disk space below minimum: {} MB.", leftDiskSpace);
-                diskSpaceReclaimerRef.updateAndGet(existing -> createNewIfNull(existing, minDiskSpace)).start();
+            try {
+                diskUsageActual.add(change);
+                final double leftDiskSpace = diskUsageLimit - diskUsageActual.sum();
+                final double minDiskSpace = getMinDiskSpace();
+                if (leftDiskSpace < minDiskSpace) {
+                    LOG.info("Left disk space below minimum: {} MB.", leftDiskSpace);
+                    if (diskSpaceReclaiming.compareAndSet(false, true)) {
+                        try {
+                            Thread.ofVirtual().name("etdb-reclaim")
+                                    .start(new DiskSpaceReclaimer(dataDir, minDiskSpace - leftDiskSpace, fileNaming, diskSpaceReclaiming,
+                                            diskUsageActual));
+                        } catch (RuntimeException e) {
+                            diskSpaceReclaiming.compareAndSet(true, false);
+                            throw e;
+                        }
+                    }
+                }
+            } catch (RuntimeException e) {
+                LOG.warn("Handling disk usage change failed.", e);
             }
         }
     }
@@ -158,10 +172,6 @@ public class Database<T> implements Closeable {
             return diskUsageLimit / 100.0;
         }
         return 1.0;
-    }
-
-    private DiskSpaceReclaimer createNewIfNull(DiskSpaceReclaimer existing, double minDiskSpace) {
-        return (existing != null) ? existing : new DiskSpaceReclaimer(dataDir, minDiskSpace);
     }
 
     private FileContext getFileContext(long recordMillis) {

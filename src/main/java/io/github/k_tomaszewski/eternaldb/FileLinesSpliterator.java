@@ -25,20 +25,20 @@ import static io.github.k_tomaszewski.util.StreamUtil.closeSafely;
 class FileLinesSpliterator implements Spliterator<String>, AutoCloseable {
 
     private static final Logger LOG = LoggerFactory.getLogger(FileLinesSpliterator.class);
-    private static final BiPredicate<Path, BasicFileAttributes> DATA_FILE_PREDICATE = (path, attributes) -> attributes.isRegularFile();
+    private static final BiPredicate<Path, BasicFileAttributes> IS_FILE_PREDICATE = (path, attributes) -> attributes.isRegularFile();
 
     final Path dataDir;
     final Stream<Path> pathStream;
     final Spliterator<Path> pathSpliterator;
-    final FileNamingStrategy fileNamingStrategy;
+    final FileNamingStrategy fileNaming;
     volatile Stream<String> fileLineStream;
     volatile Spliterator<String> fileLineSpliterator;
 
-    public FileLinesSpliterator(Path dataDir, Long minMillis, Long maxMillis, FileNamingStrategy fileNamingStrategy) throws IOException {
+    public FileLinesSpliterator(Path dataDir, Long minMillis, Long maxMillis, FileNamingStrategy fileNaming) throws IOException {
         this.dataDir = dataDir;
-        pathStream = Files.find(dataDir, fileNamingStrategy.maxDirectoryDepth(), toDataFilePredicate(minMillis, maxMillis));
+        pathStream = Files.find(dataDir, fileNaming.maxDirectoryDepth(), toDataFilePredicate(minMillis, maxMillis));
         pathSpliterator = pathStream.sorted().spliterator();
-        this.fileNamingStrategy = fileNamingStrategy;
+        this.fileNaming = fileNaming;
     }
 
     @Override
@@ -95,22 +95,22 @@ class FileLinesSpliterator implements Spliterator<String>, AutoCloseable {
     }
 
     private BiPredicate<Path, BasicFileAttributes> toDataFilePredicate(Long minMillis, Long maxMillis) {
-        BiPredicate<Path, BasicFileAttributes> predicate = DATA_FILE_PREDICATE;
+        BiPredicate<Path, BasicFileAttributes> predicate = IS_FILE_PREDICATE;
         if (minMillis != null || maxMillis != null) {
-            Predicate<String> fileNamePredicate = toFileNamePredicate(minMillis, maxMillis, fileNamingStrategy);
+            Predicate<String> fileNamePredicate = toFileNamePredicate(minMillis, maxMillis, fileNaming);
             predicate = predicate.and((path, attributes) -> fileNamePredicate.test(dataDir.relativize(path).toString()));
         }
         return predicate;
     }
 
-    static Predicate<String> toFileNamePredicate(Long minMillis, Long maxMillis, FileNamingStrategy fileNamingStrategy) {
+    static Predicate<String> toFileNamePredicate(Long minMillis, Long maxMillis, FileNamingStrategy fileNaming) {
         Predicate<String> predicate = null;
         if (minMillis != null) {
-            final String minFileName = fileNamingStrategy.formatRelativePathStr(minMillis);
+            final String minFileName = fileNaming.formatRelativePathStr(minMillis);
             predicate = (fileName) -> fileName.compareTo(minFileName) >= 0;
         }
         if (maxMillis != null) {
-            final String maxFileName = fileNamingStrategy.formatRelativePathStr(maxMillis);
+            final String maxFileName = fileNaming.formatRelativePathStr(maxMillis);
             Predicate<String> predicate2 = (fileName) -> fileName.compareTo(maxFileName) <= 0;
             predicate = (predicate != null) ? predicate.and(predicate2) : predicate2;
         }

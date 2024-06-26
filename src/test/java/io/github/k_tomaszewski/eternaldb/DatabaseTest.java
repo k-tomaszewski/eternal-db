@@ -56,6 +56,21 @@ public class DatabaseTest {
         Assertions.assertEquals(obj2, entities.getLast());
     }
 
+    @Test
+    void shouldNoticeFileGrowth() {
+        // given
+        final Path dataDir = Path.of("target/test_db_3");
+        Database<TestEntity> db = new Database<>(dataDir, 1, new JacksonSerialization(), new BasicFileNaming());
+
+        // when
+        for (int i = 0; i < 100; ++i) {
+            db.write(new TestEntity(i, "ABCDEFGHIJ0123456789ABCDEFGHIJ0123456789"), System.currentTimeMillis());
+        }
+        db.close();
+
+        // then?
+    }
+
     record TestEntity (int number, String text) {
     }
 }

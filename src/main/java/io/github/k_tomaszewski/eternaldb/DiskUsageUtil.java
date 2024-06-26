@@ -1,5 +1,7 @@
 package io.github.k_tomaszewski.eternaldb;
 
+import io.github.k_tomaszewski.util.ProcessFailureException;
+
 public class DiskUsageUtil {
 
 	/**
@@ -16,14 +18,17 @@ public class DiskUsageUtil {
 	public static long getDiskUsageKB(String path) {
 		try {
 			Process process = Runtime.getRuntime().exec(new String[]{"du", "-sk", path});		// size in KB
-			process.waitFor();
-			try (var processStdOut = process.inputReader()) {
-				return processStdOut.lines()
-						.filter(line -> line.endsWith(path))
-						.mapToLong(DiskUsageUtil::extractNumber)
-						.findFirst()
-						.orElseThrow();
+			final int duExitValue = process.waitFor();
+			if (duExitValue == 0) {
+				try (var processStdOut = process.inputReader()) {
+					return processStdOut.lines()
+							.filter(line -> line.endsWith(path))
+							.mapToLong(DiskUsageUtil::extractNumber)
+							.findFirst()
+							.orElseThrow();
+				}
 			}
+			throw new ProcessFailureException(duExitValue, process.errorReader());
 		} catch (Exception e) {
 			throw new RuntimeException("Getting disk usage of '%s' failed.".formatted(path), e);
 		}

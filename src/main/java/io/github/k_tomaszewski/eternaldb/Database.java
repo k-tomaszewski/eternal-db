@@ -1,5 +1,6 @@
 package io.github.k_tomaszewski.eternaldb;
 
+import io.github.k_tomaszewski.util.DiskUsageUtil;
 import io.github.k_tomaszewski.util.StreamUtil;
 import org.apache.commons.lang3.Validate;
 import org.slf4j.Logger;

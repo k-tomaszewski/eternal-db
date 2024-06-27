@@ -1,5 +1,6 @@
 package io.github.k_tomaszewski.eternaldb;
 
+import io.github.k_tomaszewski.util.DiskUsageUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -33,5 +34,18 @@ public class DiskUsageUtilTest {
 
         // then
         Assertions.assertTrue(diskUsageMB > 0.003f);
+    }
+
+    @Test
+    void shouldGetFileSystemInfo() {
+        // when
+        var fsInfo = DiskUsageUtil.getFileSystemInfo(".");
+        System.out.println(fsInfo);
+
+        // then
+        Assertions.assertNotNull(fsInfo);
+        Assertions.assertNotNull(fsInfo.device());
+        Assertions.assertNotNull(fsInfo.type());
+        Assertions.assertTrue(fsInfo.freeMB() >= 0.0f);
     }
 }

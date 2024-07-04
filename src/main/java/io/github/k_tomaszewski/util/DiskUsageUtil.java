@@ -40,7 +40,13 @@ public class DiskUsageUtil {
 
 	/**
 	 * Information about a file system that holds given file/directory. This calls `df` command (coreutils). See:
-	 * https://www.gnu.org/software/coreutils/manual/html_node/df-invocation.html
+	 * https://www.gnu.org/software/coreutils/manual/html_node/df-invocation.html <br/>
+	 * NOTE: There are lot faster alternatives in JDK for some use cases:
+	 * - to get free disk space on filesystem with the given file: {@link java.io.File#getUsableSpace()}
+	 * - to get file system type: {@link java.nio.file.FileStore#type()}
+	 * <br/>
+	 * HINT: In case of getting free disk space this still may be better in case of very large disk spaces. See:
+	 * https://bugs.openjdk.org/browse/JDK-8233426
 	 */
 	public static FileSystemInfo getFileSystemInfo(String path) {
 		try {

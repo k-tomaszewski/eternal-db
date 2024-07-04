@@ -141,7 +141,7 @@ public class Database<T> implements Closeable {
                     if (diskSpaceReclaiming.compareAndSet(false, true)) {
                         try {
                             Thread.ofVirtual().name("etdb-reclaim")
-                                    .start(new DiskSpaceReclaimer(dataDir, minDiskSpace - leftDiskSpace, fileNaming, diskSpaceReclaiming,
+                                    .start(new DiskSpaceReclaimer(dataDir, minDiskSpace - leftDiskSpace, diskSpaceReclaiming,
                                             diskUsageActual));
                         } catch (RuntimeException e) {
                             diskSpaceReclaiming.compareAndSet(true, false);

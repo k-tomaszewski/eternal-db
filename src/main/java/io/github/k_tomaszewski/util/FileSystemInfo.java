@@ -1,7 +1,18 @@
 package io.github.k_tomaszewski.util;
 
 public record FileSystemInfo(
-        String device,
+        /**
+         * In other words: file system. Eg. /dev/sda1
+         */
+        String volume,
+
+        /**
+         * File system type. Eg. ext4
+         */
         String type,
-        float freeMB) {
+
+        /**
+         * Free disk space for this file system, given in megabytes.
+         */
+        float freeSpaceMB) {
 }

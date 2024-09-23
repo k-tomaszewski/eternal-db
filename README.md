@@ -1,7 +1,8 @@
 # eternal-db
-Eternal DB is an embedded time series database/data store with a data retention policy based on a disk space. 
+Eternal DB is an embedded time series database/data storage engine with a data retention policy based on a disk space. 
 As oldest records are removed when needed to reclaim disk space, this database allows to collect data eternally. It gives unmatched control
 on a disk resource usage. Moreover data are easily accessible for any tools as they are kept in regular disk files on a given file system.
+It's a schema-less document database as records are just JSON documents.
 
 Some possible use cases:
 - collecting measurement data

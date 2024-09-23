@@ -36,6 +36,7 @@ public class Database<T> implements Closeable {
     // megabytes
     private final DoubleAdder diskUsageActual = new DoubleAdder();
 
+    // TODO migrate space keeping from MBs to block count
     // bytes
     private final long diskBlockSize;
 

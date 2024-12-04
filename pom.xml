@@ -4,12 +4,14 @@
   
   <groupId>io.github.k_tomaszewski</groupId>
   <artifactId>eternal-db</artifactId>
-  <version>0.0.1-SNAPSHOT</version>
-  <packaging>jar</packaging>
-  
+
+  <!-- The final version is provided by jgitver-maven-plugin -->
+  <version>0.0.0</version>
+
   <name>Eternal DB</name>
   <description>An embedded time series database/data store with data retention policy based on a disk space,
     allowing to collect data eternally.</description>
+  <url>https://github.com/k-tomaszewski/eternal-db/</url>
 
   <properties>
     <maven.compiler.source>21</maven.compiler.source>
@@ -60,5 +62,27 @@
       </plugins>
     </pluginManagement>
   </build>
+
+  <distributionManagement>
+    <repository>
+      <id>github</id>
+      <name>GitHub Packages</name>
+      <url>https://maven.pkg.github.com/k-tomaszewski/eternal-db</url>
+    </repository>
+  </distributionManagement>
+
+  <licenses>
+    <license>
+      <name>GPL-3.0 license</name>
+      <url>https://github.com/k-tomaszewski/eternal-db/?tab=GPL-3.0-1-ov-file#readme</url>
+    </license>
+  </licenses>
+  <developers>
+    <developer>
+      <name>Krzysztof Tomaszewski</name>
+      <email>krzysztof.tomaszewski@gmail.com</email>
+      <url>https://artofcode.wordpress.com/about/</url>
+    </developer>
+  </developers>
   
 </project>

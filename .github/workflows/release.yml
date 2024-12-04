@@ -1,0 +1,34 @@
+name: 'Publish package to GitHub Packages'
+on:
+  release:
+    types: [created]
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: 'Fetch all tags'
+        run: git fetch --depth=1 origin +refs/tags/*:refs/tags/*
+      - name: 'Convert lightweight tag to annotated tag'
+        run: |
+          git config --global user.email "krzysztof.tomaszewski@gmail.com"
+          git config --global user.name "k-tomaszewski"
+          LAST_TAG=$(git tag --sort=v:refname|tail -1)
+          LAST_ANNOTATED_TAG=$(git describe || echo "")
+          if [ "$LAST_TAG" != "$LAST_ANNOTATED_TAG" ]; then git tag -a -f $LAST_TAG -m "$LAST_TAG" ; else echo "NOP"; fi
+      - name: 'Set up JDK and Maven'
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+      - name: 'Publish package with Maven'
+        run: mvn -B deploy
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          JGITVER_BRANCH: main

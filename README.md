@@ -1,7 +1,7 @@
 # eternal-db
 Eternal DB is an embedded time series database/data storage engine with a data retention policy based on a disk space. 
 As oldest records are removed when needed to reclaim disk space, this database allows to collect data eternally. It gives unmatched control
-on a disk resource usage. Moreover data are easily accessible for any tools as they are kept in regular disk files on a given file system.
+on a disk resource usage. Moreover, data are easily accessible for any tools as they are kept in regular disk files on a given file system.
 It's a schema-less document database as records are just JSON documents.
 
 Some possible use cases:
@@ -11,6 +11,10 @@ Some possible use cases:
 
 In above cases the most important thing for a running system is to keep some time window of latest data. Eternal DB allows to express this 
 time window in terms of a disk space.
+
+**Please note, that this is not a classic database system like RDBMS.**
+It doesn't support SQL, users, transactions, constraints, relations, triggers, stored procedures, etc.
+Maybe the best term is a "data storage engine".
 
 As this is designed to be used under Linux, it requires Coreutils: https://www.gnu.org/software/coreutils/
 
@@ -45,6 +49,32 @@ NOTE: This project is a work-in-progress (WIP).
 4. Data are persisted as a disk files in directory tree that is representing periods of time.
 5. Project is avoiding unnecessary dependencies. No Vavr, Project Reactor, Guava, etc.
 6. The database should be easy to use in Spring Boot based application.
+
+## Usage
+### Dependency
+Add dependency to eternal-db library (use the latest version):
+```xml
+<dependency>
+  <groupId>io.github.k_tomaszewski</groupId>
+  <artifactId>eternal-db</artifactId>
+  <version>1.4.0</version>
+</dependency>
+```
+As of now the library is published only in GiHub Packages repository, so you need to add additional Maven repository in your `pom.xml` like this:
+```xml
+<repositories>
+    <repository>
+        <id>github_k-tomaszewski_eternal-db</id>
+        <url>https://maven.pkg.github.com/k-tomaszewski/notifications</url>
+    </repository>
+</repositories>
+```
+It seems that GitHub Packages repository requires authentication even for public
+artifacts, so you need to have a GitHub account and you need to set up your credentials
+(GitHub username and access token) for Maven in the `settings.xml` file. Ref:
+- https://maven.apache.org/guides/mini/guide-multiple-repositories.html
+- https://maven.apache.org/guides/mini/guide-deployment-security-settings.html
+- https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-apache-maven-registry#authenticating-with-a-personal-access-token
 
 ## Contributions
 Contributions are welcome. If you want to contribute, just make a pull request. Please contact me before to discuss your idea:

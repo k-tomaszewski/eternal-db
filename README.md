@@ -57,7 +57,7 @@ Add dependency to eternal-db library (use the latest version):
 <dependency>
   <groupId>io.github.k_tomaszewski</groupId>
   <artifactId>eternal-db</artifactId>
-  <version>1.4.0</version>
+  <version>1.0.0</version>
 </dependency>
 ```
 As of now the library is published only in GiHub Packages repository, so you need to add additional Maven repository in your `pom.xml` like this:

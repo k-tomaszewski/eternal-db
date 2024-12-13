@@ -65,7 +65,7 @@ As of now the library is published only in GiHub Packages repository, so you nee
 <repositories>
     <repository>
         <id>github_k-tomaszewski_eternal-db</id>
-        <url>https://maven.pkg.github.com/k-tomaszewski/notifications</url>
+        <url>https://maven.pkg.github.com/k-tomaszewski/eternal-db</url>
     </repository>
 </repositories>
 ```
@@ -75,6 +75,55 @@ artifacts, so you need to have a GitHub account and you need to set up your cred
 - https://maven.apache.org/guides/mini/guide-multiple-repositories.html
 - https://maven.apache.org/guides/mini/guide-deployment-security-settings.html
 - https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-apache-maven-registry#authenticating-with-a-personal-access-token
+
+### Opening a database
+To use it you create a single object of class `io.github.k_tomaszewski.eternaldb.Database`.
+Such object gives access to operations on a single data store.
+
+Please note that the `Database` is a generic class and has a type parameter. This is used for type
+checking only, so a compiler can detect when a wrong object is passed for writing method.
+
+To create instance of the `Database` class you need to provide following constructor parameters:
+- path to a directory where data files are going to be stored
+- limit of disk space to use, given as integer number of megabytes (MB)
+- object being strategy for serialization and deserialization, the library provides `JacksonSerialization` class for this purpose
+- object being strategy for naming data files, the library provides `BasicFileNaming` class for this purpose
+
+Example:
+```java
+Database<MyRecord> db = new Database<>(Path.of("/home/db"), 100,
+        new JacksonSerialization(), new BasicFileNaming());
+```
+You need one such object for a single data storage directory. Instances of `Database` class are
+thread-safe. You must not use many instances of `Database` class that are configured to use
+the same directory or subdirectories of each other.
+
+### Writing data
+There is just one method for writing data: `void write(T record, long recordMillis)`. You always
+need to give record timestamp when writing as this is a time series database. Example:
+```java
+db.write(myRecord, System.currentTimeMillis());
+```
+
+### Reading data
+There is just one method for reading data: `Stream<Timestamped<U>> read(Class<U> type, Long minMillis, Long maxMillis)`.
+This is designed to read a set of records with timestamps matching a given range [minMillis, maxMillis].
+Both ends of a time range are optional. Example of reading all records with timestamps starting
+with given time:
+```java
+List<MyRecord> entities = db.read(MyRecord.class, fromMillis, null)
+        .map(Timestamped::record).toList();
+```
+Here the given type (`MyRecord.class` in the example above) is used for deserialization purpose.
+
+### Closing a database
+After all interactions with the database are done, for example at the end of your program, 
+you should close the database object:
+```java
+db.close();
+```
+You don't need to close a database before the end of your program. It's a lightweight object
+and has rather small memory usage.
 
 ## Contributions
 Contributions are welcome. If you want to contribute, just make a pull request. Please contact me before to discuss your idea:

@@ -83,27 +83,33 @@ Such object gives access to operations on a single data store.
 Please note that the `Database` is a generic class and has a type parameter. This is used for type
 checking only, so a compiler can detect when a wrong object is passed for writing method.
 
-To create instance of the `Database` class you need to provide following constructor parameters:
+To create instance of the `Database` class you need to provide a `DatabaseProperties` object, which contains following 
+configuration properties:
 - path to a directory where data files are going to be stored
 - limit of disk space to use, given as integer number of megabytes (MB)
-- object being strategy for serialization and deserialization, the library provides `JacksonSerialization` class for this purpose
-- object being strategy for naming data files, the library provides `BasicFileNaming` class for this purpose
+- object being strategy for serialization and deserialization, the library provides `JacksonSerialization` instance as a default
+- object being strategy for naming data files, the library provides `BasicFileNaming` instance as a default
+- timestamp supplier - object implementing `ToLongFunction<T>` that returns timestamp, possibly based on a record being written. This is optional.
 
 Example:
 ```java
-Database<MyRecord> db = new Database<>(Path.of("/home/db"), 100,
-        new JacksonSerialization(), new BasicFileNaming());
+Database<MyRecord> db = new Database<>(new DatabaseProperties<>(Path.of("/home/db"), 100));
 ```
 You need one such object for a single data storage directory. Instances of `Database` class are
 thread-safe. You must not use many instances of `Database` class that are configured to use
 the same directory or subdirectories of each other.
 
 ### Writing data
-There is just one method for writing data: `void write(T record, long recordMillis)`. You always
+A basic method for writing data: `void write(T record, long recordMillis)`. To use it you
 need to give record timestamp when writing as this is a time series database. Example:
 ```java
 db.write(myRecord, System.currentTimeMillis());
 ```
+
+If a database is configured with a timestamp supplier (an object implementing `ToLongFunction<T>` interface),
+then another data writting method can be used: `void write(T record)`. Calling `write(x)` is equivalent
+of calling `write(x, timestampSupplier.applyAsLong(x))`. This can be useful when your domain model
+already contains a timestamp attribute.
 
 ### Reading data
 There is just one method for reading data: `Stream<Timestamped<U>> read(Class<U> type, Long minMillis, Long maxMillis)`.

@@ -19,6 +19,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.DoubleAdder;
 import java.util.function.IntUnaryOperator;
+import java.util.function.ToLongFunction;
 import java.util.stream.Stream;
 
 public class Database<T> implements Closeable {
@@ -45,13 +46,15 @@ public class Database<T> implements Closeable {
     private final AtomicBoolean diskSpaceReclaiming = new AtomicBoolean(false);
     private final FileNamingStrategy fileNaming;
     private final SerializationStrategy serialization;
+    private final ToLongFunction<T> timestampSupplier;
 
+    public Database(DatabaseProperties<T> config) {
+        this.dataDir = validate(config.getDataDir());
+        this.diskUsageLimit = config.getDiskUsageLimit();
+        this.fileNaming = config.getFileNaming();
+        this.serialization = config.getSerialization();
+        this.timestampSupplier = config.getTimestampSupplier();
 
-    public Database(Path dataDir, long diskUsageLimit, SerializationStrategy serialization, FileNamingStrategy fileNaming) {
-        this.dataDir = validate(dataDir);
-        this.diskUsageLimit = diskUsageLimit;
-        this.fileNaming = fileNaming;
-        this.serialization = serialization;
         diskUsageActual.add(DiskUsageUtil.getDiskUsageMB(dataDir.toString()));
         var fileStoreOpt = getFileStore();
         diskBlockSize = getBlockSize(fileStoreOpt);
@@ -63,6 +66,10 @@ public class Database<T> implements Closeable {
 
     public double getActualDiskUsageMB() {
         return diskUsageActual.doubleValue();
+    }
+
+    public void write(T record) {
+        write(record, timestampSupplier.applyAsLong(record));
     }
 
     public void write(T record, long recordMillis) {
@@ -104,6 +111,8 @@ public class Database<T> implements Closeable {
                 }
             }
         });
+        fileWriters.clear();
+        LOG.info("Closed database for directory '{}'.", dataDir);
     }
 
     private static Stream<String> filter(Stream<String> lineStream, Long minMillis, Long maxMillis) {

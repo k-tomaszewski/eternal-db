@@ -48,7 +48,7 @@ public class DiskSpaceReclaimerTest {
         DiskSpaceReclaimer reclaimer = new DiskSpaceReclaimer(dataDir, 1.0, new AtomicBoolean(), new DoubleAdder());
 
         // when
-        try (Database<Object> db = new Database<>(dataDir, 1, new JacksonSerialization(), new BasicFileNaming())) {
+        try (Database<Object> db = new Database<>(new DatabaseProperties<>(dataDir, 1))) {
             db.write(Map.of("foo", 1, "bar", 2), System.currentTimeMillis());
         }
         reclaimer.run();

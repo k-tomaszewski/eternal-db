@@ -16,7 +16,7 @@ public class DatabaseTest {
         final Path dataDir = Path.of("target/test_db");
 
         // when
-        Database<Object> db = new Database<>(dataDir, 1, new JacksonSerialization(), new BasicFileNaming());
+        Database<Object> db = new Database<>(new DatabaseProperties<>(dataDir, 1));
         db.close();
 
         // then no exception
@@ -26,7 +26,7 @@ public class DatabaseTest {
     void shouldWriteRecordToDatabase() {
         // given
         final Path dataDir = Path.of("target/test_db_2");
-        Database<Object> db = new Database<>(dataDir, 1, new JacksonSerialization(), new BasicFileNaming());
+        Database<Object> db = new Database<>(new DatabaseProperties<>(dataDir, 1));
 
         // when
         db.write(Map.of("foo", "bar"), System.currentTimeMillis());
@@ -39,7 +39,7 @@ public class DatabaseTest {
     void shouldReadWrittenRecord() {
         // given
         final Path dataDir = Path.of("target/test_db_" + UUID.randomUUID());
-        Database<Object> db = new Database<>(dataDir, 1, new JacksonSerialization(), new BasicFileNaming());
+        Database<Object> db = new Database<>(new DatabaseProperties<>(dataDir, 1));
 
         final var obj1 = new TestEntity(123, "abc");
         final var obj2 = new TestEntity(456, "XYZ");
@@ -60,7 +60,7 @@ public class DatabaseTest {
     void shouldNoticeFileGrowth() {
         // given
         final Path dataDir = Path.of("target/test_db_3");
-        Database<TestEntity> db = new Database<>(dataDir, 1, new JacksonSerialization(), new BasicFileNaming());
+        Database<TestEntity> db = new Database<>(new DatabaseProperties<>(dataDir, 1));
 
         // when
         for (int i = 0; i < 100; ++i) {
@@ -71,6 +71,26 @@ public class DatabaseTest {
         // then?
     }
 
-    record TestEntity (int number, String text) {
+    @Test
+    void shouldWriteRecordWithUseOfTimeStampSupplier() {
+        // given
+        final Path dataDir = Path.of("target/test_db_4");
+        Database<TestEntity> db = new Database<>(new DatabaseProperties<TestEntity>(dataDir, 1).setTimestampSupplier(TestEntity::ts));
+        final TestEntity recordToWrite = new TestEntity(1, "a");
+
+        // when
+        db.write(recordToWrite);
+        var records = db.read(TestEntity.class, null, null).map(Timestamped::record).toList();
+        db.close();
+
+        // then
+        Assertions.assertEquals(1, records.size());
+        Assertions.assertTrue(records.stream().allMatch(x -> x.number() == 1 && x.text().equals("a") && x.ts() == recordToWrite.ts()));
+    }
+
+    record TestEntity (int number, String text, long ts) {
+        TestEntity(int number, String text) {
+            this(number, text, System.currentTimeMillis());
+        }
     }
 }

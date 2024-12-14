@@ -17,7 +17,7 @@ public class FileLinesSpliteratorTest {
     void shouldProvideLinesFromAllFilesKeepingTimeOrdering() throws IOException {
         // given
         final Path dataDir = Path.of("target/spliterator_db_" + System.currentTimeMillis());
-        Database<String> db = new Database<>(dataDir, 1, new JacksonSerialization(), new BasicFileNaming());
+        Database<String> db = new Database<>(new DatabaseProperties<>(dataDir, 1));
 
         final var now = LocalDateTime.now();
         db.write("A", toMillis(now));

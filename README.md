@@ -131,6 +131,20 @@ db.close();
 You don't need to close a database before the end of your program. It's a lightweight object
 and has rather small memory usage.
 
+### Customization of JSON serialization/deserialization
+The library provides a default class for serlialization/deserialization strategy: `io.github.k_tomaszewski.eternaldb.JacksonSerialization`.
+It uses its own instance of Jackson ObjectMapper (precisely: JsonMapper). One can add customization by
+creating this object and passing `Consumer<ObjectMapper>` to the constructor. Example:
+```java
+Consumer<ObjectMapper> customizer = objectMapper -> objectMapper.registerModule(new JavaTimeModule())
+        .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+        .enable(SerializationFeature.WRITE_DATES_WITH_ZONE_ID)
+        .disable(DeserializationFeature.ADJUST_DATES_TO_CONTEXT_TIME_ZONE);
+
+Database<MyRecord> db = new Database<>(new DatabaseProperties<>(Path.of("/home/db"), 100)
+        .setSerialization(new JacksonSerialization(customizer)));
+```
+
 ## Contributions
 Contributions are welcome. If you want to contribute, just make a pull request. Please contact me before to discuss your idea:
 krzysztof.tomaszewski (at) gmail.com

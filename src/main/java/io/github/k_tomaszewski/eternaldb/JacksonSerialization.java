@@ -8,14 +8,22 @@ import com.fasterxml.jackson.databind.json.JsonMapper;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.io.Writer;
+import java.util.function.Consumer;
 
 public class JacksonSerialization implements SerializationStrategy {
 
     private final ObjectMapper objectMapper;
 
     public JacksonSerialization() {
-        objectMapper = new JsonMapper()
-                .disable(JsonGenerator.Feature.AUTO_CLOSE_TARGET);
+        this(null);
+    }
+
+    public JacksonSerialization(Consumer<ObjectMapper> objectMapperCustomizer) {
+        objectMapper = new JsonMapper();
+        if (objectMapperCustomizer != null) {
+            objectMapperCustomizer.accept(objectMapper);
+        }
+        objectMapper.disable(JsonGenerator.Feature.AUTO_CLOSE_TARGET);
     }
 
     @Override

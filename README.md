@@ -1,4 +1,6 @@
 # eternal-db
+[![Unit Tests](https://github.com/k-tomaszewski/eternal-db/actions/workflows/maven.yml/badge.svg)](https://github.com/k-tomaszewski/eternal-db/actions/workflows/maven.yml/badge.svg)
+
 Eternal DB is an embedded time series database/data storage engine with a data retention policy based on a disk space. 
 As oldest records are removed when needed to reclaim disk space, this database allows to collect data eternally. It gives unmatched control
 on a disk resource usage. Moreover, data are easily accessible for any tools as they are kept in regular disk files on a given file system.

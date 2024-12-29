@@ -24,6 +24,8 @@ import java.util.stream.Stream;
 
 public class Database<T> implements Closeable {
 
+    public static final char NEW_LINE_CHAR = '\n';
+
     private static final Logger LOG = LoggerFactory.getLogger(Database.class);
     private static final int WRITES_TO_CHECK_DISK_USAGE = 10;
     private static final int DEFAULT_BLOCK_SIZE = 4096;
@@ -80,7 +82,7 @@ public class Database<T> implements Closeable {
                 BufferedWriter fileWriter = context.getFileWriter();
                 fileWriter.append(Long.toString(recordMillis, TIMESTAMP_RADIX)).append('\t');
                 serialization.serialize(record, fileWriter);
-                fileWriter.newLine();
+                fileWriter.append(NEW_LINE_CHAR);
                 fileGrowthMB = context.calculateFileGrowthMB();
             }
         } catch (Exception e) {
@@ -91,9 +93,9 @@ public class Database<T> implements Closeable {
 
     public <U> Stream<Timestamped<U>> read(Class<U> type, Long minMillis, Long maxMillis) {
         try {
-            var lineStream = StreamUtil.stream(new FileLinesSpliterator(dataDir, minMillis, maxMillis, fileNaming), false);
-            return filter(lineStream, minMillis, maxMillis)
-                    .map(line -> readRecordLine(line, type))
+            var spliterator = new FileLinesSpliterator(dataDir, minMillis, maxMillis, fileNaming);
+            return filter(StreamUtil.stream(spliterator, false), minMillis, maxMillis)
+                    .map(line -> readRecordLine(line, type, spliterator))
                     .filter(Objects::nonNull);
         } catch (IOException e) {
             throw new RuntimeException("Database read failed.", e);
@@ -125,13 +127,13 @@ public class Database<T> implements Closeable {
         return lineStream;
     }
 
-    private <U> Timestamped<U> readRecordLine(String line, Class<U> type) {
+    private <U> Timestamped<U> readRecordLine(String line, Class<U> type, ReadContext ctx) {
         try {
             int tabPos = line.indexOf('\t');
             return new Timestamped<>(serialization.deserialize(line.substring(tabPos + 1), type),
                     Long.parseLong(line, 0, tabPos, TIMESTAMP_RADIX));
         } catch (RuntimeException e) {
-            LOG.warn("Record reading failed.", e);
+            LOG.warn("Record reading failed (file: {}). Line: `{}`", ctx.getCurrentPath(), line, e);
             return null;
         }
     }

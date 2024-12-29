@@ -22,7 +22,7 @@ import static io.github.k_tomaszewski.util.StreamUtil.closeSafely;
  * NOTE: This is a closeable spliterator. Use {@link io.github.k_tomaszewski.util.StreamUtil#stream(Spliterator, boolean)} to create
  * a Stream object that will close this spliterator. Otherwise, it won't be closed. See: https://bugs.openjdk.org/browse/JDK-8318856
  */
-class FileLinesSpliterator implements Spliterator<String>, AutoCloseable {
+class FileLinesSpliterator implements Spliterator<String>, AutoCloseable, ReadContext {
 
     private static final Logger LOG = LoggerFactory.getLogger(FileLinesSpliterator.class);
     private static final BiPredicate<Path, BasicFileAttributes> IS_FILE_PREDICATE = (path, attributes) -> attributes.isRegularFile();
@@ -33,6 +33,7 @@ class FileLinesSpliterator implements Spliterator<String>, AutoCloseable {
     final FileNamingStrategy fileNaming;
     volatile Stream<String> fileLineStream;
     volatile Spliterator<String> fileLineSpliterator;
+    volatile Path currentPath;
 
     public FileLinesSpliterator(Path dataDir, Long minMillis, Long maxMillis, FileNamingStrategy fileNaming) throws IOException {
         this.dataDir = dataDir;
@@ -78,10 +79,16 @@ class FileLinesSpliterator implements Spliterator<String>, AutoCloseable {
         return ORDERED | IMMUTABLE | NONNULL;
     }
 
+    @Override
+    public Path getCurrentPath() {
+        return currentPath;
+    }
+
     private void openDataFile(Path path) {
         try {
             fileLineStream = Files.lines(path, StandardCharsets.UTF_8);         // TODO add handling of compressed data files
             fileLineSpliterator = fileLineStream.sorted().spliterator();
+            currentPath = path;
         } catch (IOException e) {
             LOG.warn("Cannot read data from file {}", path, e);
             closeDataFile();
@@ -92,6 +99,7 @@ class FileLinesSpliterator implements Spliterator<String>, AutoCloseable {
         closeSafely(fileLineStream);
         fileLineStream = null;
         fileLineSpliterator = null;
+        currentPath = null;
     }
 
     private BiPredicate<Path, BasicFileAttributes> toDataFilePredicate(Long minMillis, Long maxMillis) {

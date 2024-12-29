@@ -74,7 +74,7 @@ public class DatabaseTest {
     @Test
     void shouldWriteRecordWithUseOfTimeStampSupplier() {
         // given
-        final Path dataDir = Path.of("target/test_db_4");
+        final Path dataDir = Path.of("target/test_db_" + UUID.randomUUID());
         Database<TestEntity> db = new Database<>(new DatabaseProperties<TestEntity>(dataDir, 1).setTimestampSupplier(TestEntity::ts));
         final TestEntity recordToWrite = new TestEntity(1, "a");
 

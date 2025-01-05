@@ -46,6 +46,7 @@ class FileContext {
     }
 
     double calculateFileGrowthMB() {
+        // TODO introduce configurable strategy here to control when to run rather expensive `DiskUsageUtil.getDiskUsageKB(..)`
         timesToDiskUsageCheck = diskUsageCheckDelayFunction.applyAsInt(timesToDiskUsageCheck);
         if (timesToDiskUsageCheck == 0) {
             long currentDiskUsageKB = DiskUsageUtil.getDiskUsageKB(path.toString());

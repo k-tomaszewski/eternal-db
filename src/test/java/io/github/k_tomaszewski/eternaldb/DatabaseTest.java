@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -86,6 +87,51 @@ public class DatabaseTest {
         // then
         Assertions.assertEquals(1, records.size());
         Assertions.assertTrue(records.stream().allMatch(x -> x.number() == 1 && x.text().equals("a") && x.ts() == recordToWrite.ts()));
+    }
+
+    @Test
+    void shouldNotPurgeFileWritersWhenNoFileWritersPresent() {
+        // given
+        final Path dataDir = Path.of("target/test_db");
+
+        // when
+        Database<Object> db = new Database<>(new DatabaseProperties<>(dataDir, 1));
+        int count = db.purgeFileWriters();
+        db.close();
+
+        // then
+        Assertions.assertEquals(0, count);
+    }
+
+    @Test
+    void shouldNotPurgeFileWritersWhenNoFileWritersAreIdle() {
+        // given
+        final Path dataDir = Path.of("target/test_db");
+
+        // when
+        Database<Object> db = new Database<>(new DatabaseProperties<>(dataDir, 1));
+        db.write("abc", System.currentTimeMillis());
+        int count = db.purgeFileWriters();
+        db.close();
+
+        // then
+        Assertions.assertEquals(0, count);
+    }
+
+    @Test
+    void shouldPurgeFileWritersWhenTheyAreIdle() throws InterruptedException {
+        // given
+        final Path dataDir = Path.of("target/test_db");
+
+        // when
+        Database<Object> db = new Database<>(new DatabaseProperties<>(dataDir, 1).setFileMaxIdleTime(Duration.ofSeconds(1)));
+        db.write("abc", System.currentTimeMillis());
+        Thread.sleep(2000);
+        int count = db.purgeFileWriters();
+        db.close();
+
+        // then
+        Assertions.assertEquals(1, count);
     }
 
     record TestEntity (int number, String text, long ts) {

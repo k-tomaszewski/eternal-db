@@ -1,6 +1,10 @@
 package io.github.k_tomaszewski.eternaldb;
 
+import org.apache.commons.lang3.Validate;
+
 import java.nio.file.Path;
+import java.time.Duration;
+import java.util.Objects;
 import java.util.function.ToLongFunction;
 
 /**
@@ -16,6 +20,7 @@ public class DatabaseProperties<T> {
     private ToLongFunction<T> timestampSupplier = (x) -> {
         throw new UnsupportedOperationException("Timestamp supplier not provided in configuration");
     };
+    private Duration fileMaxIdleTime = Duration.ofMinutes(5);
 
     public DatabaseProperties() {
     }
@@ -72,6 +77,16 @@ public class DatabaseProperties<T> {
 
     public DatabaseProperties<T> setTimestampSupplier(ToLongFunction<T> timestampSupplier) {
         this.timestampSupplier = timestampSupplier;
+        return this;
+    }
+
+    public Duration getFileMaxIdleTime() {
+        return fileMaxIdleTime;
+    }
+
+    public DatabaseProperties<T> setFileMaxIdleTime(Duration fileMaxIdleTime) {
+        this.fileMaxIdleTime = Objects.requireNonNull(fileMaxIdleTime, "File max idle time must be not null");
+        Validate.isTrue(fileMaxIdleTime.toSeconds() >= 1L, "File max idle time must be at least 1 second");
         return this;
     }
 }

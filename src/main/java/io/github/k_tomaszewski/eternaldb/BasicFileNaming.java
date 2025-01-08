@@ -1,5 +1,6 @@
 package io.github.k_tomaszewski.eternaldb;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -13,19 +14,23 @@ public class BasicFileNaming implements FileNamingStrategy {
     public enum Mode {
 
         /**
+         * A single database file is created for records within each hour.
          * This mode is better for databases collecting data with higher speed.
          */
-        HOURLY("yyyy-MM-dd_HH00"),
+        HOURLY("yyyy-MM-dd_HH00", Duration.ofHours(1)),
 
         /**
+         * A single database file is created for records within each day.
          * This mode is better for databases collecting data with lower speed, like once every minute.
          */
-        DAILY("yyyy-MM-dd");
+        DAILY("yyyy-MM-dd", Duration.ofDays(1));
 
         private final DateTimeFormatter formatter;
+        private final Duration interval;
 
-        Mode(String dateTimeFormatStr) {
+        Mode(String dateTimeFormatStr, Duration interval) {
             formatter = DateTimeFormatter.ofPattern(dateTimeFormatStr);
+            this.interval = interval;
         }
     }
 

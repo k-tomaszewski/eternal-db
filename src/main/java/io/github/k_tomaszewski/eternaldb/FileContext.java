@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.BufferedWriter;
+import java.io.Closeable;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -15,14 +16,14 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.nio.file.StandardOpenOption.APPEND;
 import static java.nio.file.StandardOpenOption.CREATE;
 
-class FileContext {
+class FileContext implements Closeable {
 
     private static final Logger LOG = LoggerFactory.getLogger(FileContext.class);
 
     private final Path path;
     private final BufferedWriter fileWriter;
     private final IntUnaryOperator diskUsageCheckDelayFunction;
-    private long lastUseMillis;
+    private long lastUseNanoTime;
     private long lastDiskUsageKB;
     private int timesToDiskUsageCheck;
 
@@ -41,7 +42,7 @@ class FileContext {
     }
 
     BufferedWriter getFileWriter() {
-        lastUseMillis = System.currentTimeMillis();
+        lastUseNanoTime = System.nanoTime();
         return fileWriter;
     }
 
@@ -56,5 +57,14 @@ class FileContext {
             return growthMB;
         }
         return 0.0;
+    }
+
+    long getLastUseNanoTime() {
+        return lastUseNanoTime;
+    }
+
+    @Override
+    public void close() throws IOException {
+        fileWriter.close();
     }
 }

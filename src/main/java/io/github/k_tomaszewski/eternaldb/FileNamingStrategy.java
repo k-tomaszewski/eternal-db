@@ -1,5 +1,8 @@
 package io.github.k_tomaszewski.eternaldb;
 
+import java.time.Duration;
+import java.util.Optional;
+
 public interface FileNamingStrategy {
 
     /**
@@ -9,4 +12,11 @@ public interface FileNamingStrategy {
     String formatRelativePathStr(long recordMillis);
 
     int maxDirectoryDepth();
+
+    /**
+     * File creation interval, if a strategy has one.
+     */
+    default Optional<Duration> fileCreationInterval() {
+        return Optional.empty();
+    }
 }

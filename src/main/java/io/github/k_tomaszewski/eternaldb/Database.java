@@ -12,10 +12,14 @@ import java.io.IOException;
 import java.nio.file.FileStore;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.DoubleAdder;
 import java.util.function.IntUnaryOperator;
@@ -49,13 +53,15 @@ public class Database<T> implements Closeable {
     private final FileNamingStrategy fileNaming;
     private final SerializationStrategy serialization;
     private final ToLongFunction<T> timestampSupplier;
+    private final long maxIdleSeconds;
+    private final ScheduledExecutorService scheduler;
 
     public Database(DatabaseProperties<T> config) {
-        this.dataDir = validate(config.getDataDir());
-        this.diskUsageLimit = config.getDiskUsageLimit();
-        this.fileNaming = config.getFileNaming();
-        this.serialization = config.getSerialization();
-        this.timestampSupplier = config.getTimestampSupplier();
+        dataDir = validate(config.getDataDir());
+        diskUsageLimit = config.getDiskUsageLimit();
+        fileNaming = config.getFileNaming();
+        serialization = config.getSerialization();
+        timestampSupplier = config.getTimestampSupplier();
 
         diskUsageActual.add(DiskUsageUtil.getDiskUsageMB(dataDir.toString()));
         var fileStoreOpt = getFileStore();
@@ -64,6 +70,11 @@ public class Database<T> implements Closeable {
         LOG.info("Data directory: '{}'. Disk usage limit: {} MB. Disk usage: {} MB. File store type: {}. Block size: {} B.",
                 dataDir, diskUsageLimit, getActualDiskUsageMB(), fileStoreOpt.map(FileStore::type).orElse("?"),
                 diskBlockSize);
+
+        maxIdleSeconds = config.getFileMaxIdleTime().toSeconds();
+        scheduler = Executors.newSingleThreadScheduledExecutor();
+        long purgeDelaySeconds = fileNaming.fileCreationInterval().orElse(Duration.ofHours(1)).toSeconds();
+        scheduler.scheduleAtFixedRate(this::purgeFileWriters, purgeDelaySeconds + maxIdleSeconds, purgeDelaySeconds, TimeUnit.SECONDS);
     }
 
     public double getActualDiskUsageMB() {
@@ -104,17 +115,43 @@ public class Database<T> implements Closeable {
 
     @Override
     public void close() {
-        fileWriters.values().forEach(context -> {
+        scheduler.shutdownNow();
+        fileWriters.forEach((path, context) -> {
             synchronized (context) {
-                try {
-                    context.getFileWriter().close();
-                } catch (IOException e) {
-                    LOG.warn("Closing one of db files failed.", e);
-                }
+                close(context, path);
             }
         });
         fileWriters.clear();
         LOG.info("Closed database for directory '{}'.", dataDir);
+    }
+
+    int purgeFileWriters() {
+        int count = 0;
+        var iterator = fileWriters.entrySet().iterator();
+        while (iterator.hasNext()) {
+            var fileWriterEntry = iterator.next();
+            FileContext context = fileWriterEntry.getValue();
+            synchronized (context) {
+                if ((System.nanoTime() - context.getLastUseNanoTime()) / 1_000_000_000L > maxIdleSeconds) {
+                    iterator.remove();
+                    if (close(context, fileWriterEntry.getKey())) {
+                        LOG.trace("Closed idle db file: {}", fileWriterEntry.getKey());
+                    }
+                    ++count;
+                }
+            }
+        }
+        return count;
+    }
+
+    private static boolean close(FileContext context, String path) {
+        try {
+            context.close();
+            return true;
+        } catch (IOException e) {
+            LOG.warn("Closing db file {} failed.", path, e);
+            return false;
+        }
     }
 
     private static Stream<String> filter(Stream<String> lineStream, Long minMillis, Long maxMillis) {

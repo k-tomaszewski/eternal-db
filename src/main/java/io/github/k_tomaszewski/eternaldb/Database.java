@@ -188,12 +188,7 @@ public class Database<T> implements Closeable {
     }
 
     private FileContext getFileContext(long recordMillis) {
-        return fileWriters.compute(fileNaming.formatRelativePathStr(recordMillis), (relativeFilePath, context) -> {
-            if (context == null) {
-                context = createFileContext(relativeFilePath);
-            }
-            return context;
-        });
+        return fileWriters.computeIfAbsent(fileNaming.formatRelativePathStr(recordMillis), this::createFileContext);
     }
 
     private FileContext createFileContext(String relativeFilePath) {

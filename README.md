@@ -32,7 +32,9 @@ NOTE: This project is a work-in-progress (WIP).
 6. A record always has a timestamp and time is considered an indexed attribute.
 7. It is meant to run in a Linux environment.
 8. It is thread-safe.
-9. It is fault-tolerant. A single error should not block you from reading all your data.
+9. It is fault-tolerant. A single error should not block you from reading all your data. As files are written only by appending a corrupted
+   file may only be a result of not closing a database object before JVM exit. In this case some records may be lost, but a single data file
+   may have only the last record corrupted. A database can continue using this file when started again.
 
 ## Non-goals
 1. This is not meant to run as a standalone server enabling multiple clients to connect and use.
@@ -49,9 +51,10 @@ NOTE: This project is a work-in-progress (WIP).
 2. Records are kept formatted as single line JSON, thus a single data file has a format similar to JSON Lines: https://jsonlines.org/
 3. Each line in a data file is beginning with timestamp being number of millis from the Epoch (as given by `System.currentTimeMillis()`)
    and formatted with radix of 32 (to use less disk space), followed by the tab character, followed by JSON.
-4. Data are persisted as a disk files in directory tree that is representing periods of time.
-5. Project is avoiding unnecessary dependencies. No Vavr, Project Reactor, Guava, etc.
-6. The database should be easy to use in Spring Boot based application.
+4. Unix line endings are used in data files, as it is only 1 byte and it makes it easier to detect corrupted file.
+5. Data are persisted as a disk files in directory tree that is representing periods of time.
+6. Project is avoiding unnecessary dependencies. No Vavr, Project Reactor, Guava, etc.
+7. The database should be easy to use in Spring Boot based application.
 
 ## Usage
 ### Dependency

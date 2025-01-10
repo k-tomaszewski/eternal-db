@@ -64,7 +64,7 @@ public class Database<T> implements Closeable {
         timestampSupplier = config.getTimestampSupplier();
 
         diskUsageActual.add(DiskUsageUtil.getDiskUsageMB(dataDir.toString()));
-        var fileStoreOpt = getFileStore();
+        var fileStoreOpt = getFileStore(dataDir);
         diskBlockSize = getBlockSize(fileStoreOpt);
 
         LOG.info("Data directory: '{}'. Disk usage limit: {} MB. Disk usage: {} MB. File store type: {}. Block size: {} B.",
@@ -77,7 +77,7 @@ public class Database<T> implements Closeable {
         scheduler.scheduleAtFixedRate(this::purgeFileWriters, purgeDelaySeconds + maxIdleSeconds, purgeDelaySeconds, TimeUnit.SECONDS);
     }
 
-    public double getActualDiskUsageMB() {
+    public final double getActualDiskUsageMB() {
         return diskUsageActual.doubleValue();
     }
 
@@ -125,7 +125,7 @@ public class Database<T> implements Closeable {
         LOG.info("Closed database for directory '{}'.", dataDir);
     }
 
-    int purgeFileWriters() {
+    final int purgeFileWriters() {
         int count = 0;
         var iterator = fileWriters.entrySet().iterator();
         while (iterator.hasNext()) {
@@ -258,7 +258,7 @@ public class Database<T> implements Closeable {
         return dir;
     }
 
-    private Optional<FileStore> getFileStore() {
+    private static Optional<FileStore> getFileStore(Path dataDir) {
         try {
             return Optional.of(Files.getFileStore(dataDir));
         } catch (Exception e) {

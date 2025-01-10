@@ -3,6 +3,7 @@ package io.github.k_tomaszewski.util;
 import java.io.BufferedReader;
 import java.io.IOException;
 
+@SuppressWarnings("serial")
 public class ProcessFailureException extends RuntimeException {
 
     public ProcessFailureException(int exitValue, BufferedReader stdErrOutput) {

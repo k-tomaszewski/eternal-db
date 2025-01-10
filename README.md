@@ -2,7 +2,7 @@
 [![Unit Tests](https://github.com/k-tomaszewski/eternal-db/actions/workflows/maven.yml/badge.svg)](https://github.com/k-tomaszewski/eternal-db/actions/workflows/maven.yml)
 
 ## Overview
-Eternal DB is an embedded time series database/data storage engine with a data retention policy based on a disk space. 
+Eternal DB is a Java embedded time series database/data storage engine with a data retention policy based on a disk space. 
 As oldest records are removed when needed to reclaim disk space, this database allows to collect data eternally. It gives unmatched control
 on a disk resource usage. Moreover, data are easily accessible for any tools as they are kept in regular disk files on a given file system.
 It's a schema-less document database as records are just JSON documents.
@@ -19,7 +19,9 @@ time window in terms of a disk space.
 It doesn't support SQL, users, transactions, constraints, relations, triggers, stored procedures, etc.
 Maybe the best term is a "data storage engine".
 
-As this is designed to be used under Linux, it requires Coreutils: https://www.gnu.org/software/coreutils/
+As this is designed to be used under Linux, it requires Coreutils https://www.gnu.org/software/coreutils/ or a compatible software module
+that supports running the command `du -sk`. Most likely it can work with BusyBox as well: https://www.busybox.net/downloads/BusyBox.html#du
+(not verified yet).
 
 NOTE: This project is a work-in-progress (WIP).
 

@@ -27,9 +27,12 @@ public class FileLinesSpliteratorTest {
         db.write("E", toMillis(now.minusMonths(1)));
         db.write("F", toMillis(now.minusMonths(1).minusNanos(1000000)));
 
+        final long fromTs = toMillis(now.minusMonths(1).minusNanos(1000000));
+        final long toTs = toMillis(now);
+
         // when
         String result;
-        try (Stream<String> linesStream = StreamUtil.stream(new FileLinesSpliterator(dataDir, null, null, new BasicFileNaming()), false)) {
+        try (Stream<String> linesStream = StreamUtil.stream(new FileLinesSpliterator(dataDir, fromTs, toTs, new BasicFileNaming()), false)) {
             result = linesStream.map(line -> line.substring(line.indexOf('\t') + 2, line.length() - 1))
                     .collect(Collectors.joining());
         }

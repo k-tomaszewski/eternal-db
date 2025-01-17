@@ -27,19 +27,15 @@ class FileLinesSpliterator implements Spliterator<String>, AutoCloseable, ReadCo
     private static final Logger LOG = LoggerFactory.getLogger(FileLinesSpliterator.class);
     private static final BiPredicate<Path, BasicFileAttributes> IS_FILE_PREDICATE = (path, attributes) -> attributes.isRegularFile();
 
-    final Path dataDir;
     final Stream<Path> pathStream;
     final Spliterator<Path> pathSpliterator;
-    final FileNamingStrategy fileNaming;
     volatile Stream<String> fileLineStream;
     volatile Spliterator<String> fileLineSpliterator;
     volatile Path currentPath;
 
     public FileLinesSpliterator(Path dataDir, Long minMillis, Long maxMillis, FileNamingStrategy fileNaming) throws IOException {
-        this.dataDir = dataDir;
-        pathStream = Files.find(dataDir, fileNaming.maxDirectoryDepth(), toDataFilePredicate(minMillis, maxMillis));
+        pathStream = Files.find(dataDir, fileNaming.maxDirectoryDepth(), toDataFilePredicate(minMillis, maxMillis, fileNaming, dataDir));
         pathSpliterator = pathStream.sorted().spliterator();
-        this.fileNaming = fileNaming;
     }
 
     @Override
@@ -102,7 +98,8 @@ class FileLinesSpliterator implements Spliterator<String>, AutoCloseable, ReadCo
         currentPath = null;
     }
 
-    private BiPredicate<Path, BasicFileAttributes> toDataFilePredicate(Long minMillis, Long maxMillis) {
+    private static BiPredicate<Path, BasicFileAttributes> toDataFilePredicate(Long minMillis, Long maxMillis,
+            FileNamingStrategy fileNaming, Path dataDir) {
         BiPredicate<Path, BasicFileAttributes> predicate = IS_FILE_PREDICATE;
         if (minMillis != null || maxMillis != null) {
             Predicate<String> fileNamePredicate = toFileNamePredicate(minMillis, maxMillis, fileNaming);

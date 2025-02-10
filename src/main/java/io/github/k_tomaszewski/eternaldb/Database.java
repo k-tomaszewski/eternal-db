@@ -1,8 +1,6 @@
 package io.github.k_tomaszewski.eternaldb;
 
 import io.github.k_tomaszewski.util.DiskUsageUtil;
-import io.github.k_tomaszewski.util.StreamUtil;
-import org.apache.commons.lang3.Validate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -13,7 +11,6 @@ import java.nio.file.FileStore;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -24,18 +21,17 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.DoubleAdder;
 import java.util.function.IntUnaryOperator;
 import java.util.function.ToLongFunction;
-import java.util.stream.Stream;
 
-public class Database<T> implements Closeable {
+/**
+ * Read-write database. It should be closed.
+ */
+public class Database<T> extends ReadOnlyDatabase implements Closeable {
 
     public static final char NEW_LINE_CHAR = '\n';
 
     private static final Logger LOG = LoggerFactory.getLogger(Database.class);
     private static final int WRITES_TO_CHECK_DISK_USAGE = 10;
     private static final int DEFAULT_BLOCK_SIZE = 4096;
-    private static final int TIMESTAMP_RADIX = 32;
-
-    private final Path dataDir;
 
     // megabytes
     private final long diskUsageLimit;
@@ -50,17 +46,13 @@ public class Database<T> implements Closeable {
     private final ConcurrentMap<String, FileContext> fileWriters = new ConcurrentHashMap<>();
     private final IntUnaryOperator diskUsageCheckDelayFunction = (n) -> (n > 0) ? --n : WRITES_TO_CHECK_DISK_USAGE;
     private final AtomicBoolean diskSpaceReclaiming = new AtomicBoolean(false);
-    private final FileNamingStrategy fileNaming;
-    private final SerializationStrategy serialization;
     private final ToLongFunction<T> timestampSupplier;
     private final long maxIdleSeconds;
     private final ScheduledExecutorService scheduler;
 
     public Database(DatabaseProperties<T> config) {
-        dataDir = validate(config.getDataDir());
+        super(config);
         diskUsageLimit = config.getDiskUsageLimit();
-        fileNaming = config.getFileNaming();
-        serialization = config.getSerialization();
         timestampSupplier = config.getTimestampSupplier();
 
         diskUsageActual.add(DiskUsageUtil.getDiskUsageMB(dataDir.toString()));
@@ -102,17 +94,6 @@ public class Database<T> implements Closeable {
         onDiskUsageChange(fileGrowthMB);
     }
 
-    public <U> Stream<Timestamped<U>> read(Class<U> type, Long minMillis, Long maxMillis) {
-        try {
-            var spliterator = new FileLinesSpliterator(dataDir, minMillis, maxMillis, fileNaming);
-            return filter(StreamUtil.stream(spliterator, false), minMillis, maxMillis)
-                    .map(line -> readRecordLine(line, type, spliterator))
-                    .filter(Objects::nonNull);
-        } catch (IOException e) {
-            throw new RuntimeException("Database read failed.", e);
-        }
-    }
-
     @Override
     public void close() {
         scheduler.shutdownNow();
@@ -151,27 +132,6 @@ public class Database<T> implements Closeable {
         } catch (IOException e) {
             LOG.warn("Closing db file {} failed.", path, e);
             return false;
-        }
-    }
-
-    private static Stream<String> filter(Stream<String> lineStream, Long minMillis, Long maxMillis) {
-        if (minMillis != null || maxMillis != null) {
-            lineStream = lineStream.filter(line -> {
-                long recordMillis = Long.parseLong(line, 0, line.indexOf('\t'), TIMESTAMP_RADIX);
-                return (minMillis == null || minMillis <= recordMillis) && (maxMillis == null || maxMillis >= recordMillis);
-            });
-        }
-        return lineStream;
-    }
-
-    private <U> Timestamped<U> readRecordLine(String line, Class<U> type, ReadContext ctx) {
-        try {
-            int tabPos = line.indexOf('\t');
-            return new Timestamped<>(serialization.deserialize(line.substring(tabPos + 1), type),
-                    Long.parseLong(line, 0, tabPos, TIMESTAMP_RADIX));
-        } catch (RuntimeException e) {
-            LOG.warn("Record reading failed (file: {}). Line: `{}`", ctx.getCurrentPath(), line, e);
-            return null;
         }
     }
 
@@ -242,20 +202,6 @@ public class Database<T> implements Closeable {
         } catch (IOException e) {
             throw new RuntimeException("Cannot open data file %s".formatted(dataFilePath), e);
         }
-    }
-
-    private static Path validate(Path dir) {
-        Objects.requireNonNull(dir, "Data directory cannot be null");
-        if (!Files.exists(dir)) {
-            LOG.info("Data directory '{}' doesn't exist. Creating...", dir);
-            try {
-                Files.createDirectories(dir);
-            } catch (IOException e) {
-                throw new RuntimeException("Cannot create data directory: %s".formatted(dir), e);
-            }
-        }
-        Validate.isTrue(Files.isDirectory(dir), "Path for data directory is not a directory: %s", dir);
-        return dir;
     }
 
     private static Optional<FileStore> getFileStore(Path dataDir) {

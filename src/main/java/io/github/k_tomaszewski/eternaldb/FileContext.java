@@ -67,4 +67,13 @@ class FileContext implements Closeable {
     public void close() throws IOException {
         fileWriter.close();
     }
+
+    boolean flushSafely() {
+        try {
+            fileWriter.flush();
+            return true;
+        } catch (IOException e) {
+            return false;
+        }
+    }
 }

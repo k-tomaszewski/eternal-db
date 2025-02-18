@@ -5,6 +5,7 @@ import org.apache.commons.lang3.Validate;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Objects;
+import java.util.function.BooleanSupplier;
 import java.util.function.ToLongFunction;
 
 /**
@@ -21,6 +22,7 @@ public class DatabaseProperties<T> {
         throw new UnsupportedOperationException("Timestamp supplier not provided in configuration");
     };
     private Duration fileMaxIdleTime = Duration.ofMinutes(5);
+    private BooleanSupplier flushCondition;
 
     public DatabaseProperties() {
     }
@@ -88,5 +90,21 @@ public class DatabaseProperties<T> {
         this.fileMaxIdleTime = Objects.requireNonNull(fileMaxIdleTime, "File max idle time must be not null");
         Validate.isTrue(fileMaxIdleTime.toSeconds() >= 1L, "File max idle time must be at least 1 second");
         return this;
+    }
+
+    public BooleanSupplier getFlushCondition() {
+        return flushCondition;
+    }
+
+    /**
+     * `flushCondition.getAsBoolean()` must be thread safe.
+     */
+    public DatabaseProperties<T> setFlushCondition(BooleanSupplier flushCondition) {
+        this.flushCondition = flushCondition;
+        return this;
+    }
+
+    public DatabaseProperties<T> withFlushOnEveryWrite() {
+        return setFlushCondition(() -> true);
     }
 }

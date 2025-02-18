@@ -5,9 +5,12 @@ import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 public class DatabaseTest {
 
@@ -132,6 +135,29 @@ public class DatabaseTest {
 
         // then
         Assertions.assertEquals(1, count);
+    }
+
+    @Test
+    void shouldHandleFlushing() {
+        // given
+        final Path dataDir = Path.of("target/test_db_" + UUID.randomUUID());
+        final var config = new DatabaseProperties<>(dataDir, 1).withFlushOnEveryWrite();
+        Set<String> writtenValues = new HashSet<>();
+
+        // when
+        Database<Object> db = new Database<>(config);
+        for (int i = 0; i < 100; ++i) {
+            String value = "abc_" + i;
+            db.write(value, System.currentTimeMillis());
+            writtenValues.add(value);
+        }
+
+        // ...no reading data without prior closing `db` object...
+        ReadOnlyDatabase rodb = new ReadOnlyDatabase(config);
+        Set<String> readValues = rodb.read(String.class, null, null).map(Timestamped::record).collect(Collectors.toSet());
+
+        // then
+        Assertions.assertEquals(writtenValues, readValues);
     }
 
     record TestEntity (int number, String text, long ts) {

@@ -19,6 +19,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.DoubleAdder;
+import java.util.function.BooleanSupplier;
 import java.util.function.IntUnaryOperator;
 import java.util.function.ToLongFunction;
 
@@ -49,6 +50,7 @@ public class Database<T> extends ReadOnlyDatabase implements Closeable {
     private final ToLongFunction<T> timestampSupplier;
     private final long maxIdleSeconds;
     private final ScheduledExecutorService scheduler;
+    private final BooleanSupplier flushCondition;
 
     public Database(DatabaseProperties<T> config) {
         super(config);
@@ -67,6 +69,8 @@ public class Database<T> extends ReadOnlyDatabase implements Closeable {
         scheduler = Executors.newSingleThreadScheduledExecutor();
         long purgeDelaySeconds = fileNaming.fileCreationInterval().orElse(Duration.ofHours(1)).toSeconds();
         scheduler.scheduleAtFixedRate(this::purgeFileWriters, purgeDelaySeconds + maxIdleSeconds, purgeDelaySeconds, TimeUnit.SECONDS);
+
+        flushCondition = config.getFlushCondition();
     }
 
     public final double getActualDiskUsageMB() {
@@ -86,6 +90,9 @@ public class Database<T> extends ReadOnlyDatabase implements Closeable {
                 fileWriter.append(Long.toString(recordMillis, TIMESTAMP_RADIX)).append('\t');
                 serialization.serialize(record, fileWriter);
                 fileWriter.append(NEW_LINE_CHAR);
+                if (flushCondition != null && flushCondition.getAsBoolean()) {
+                    context.flushSafely();
+                }
                 fileGrowthMB = context.calculateFileGrowthMB();
             }
         } catch (Exception e) {

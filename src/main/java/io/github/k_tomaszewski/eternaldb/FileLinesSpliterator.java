@@ -14,6 +14,7 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 
+import static io.github.k_tomaszewski.util.FileUtils.IS_FILE_PREDICATE;
 import static io.github.k_tomaszewski.util.StreamUtil.closeSafely;
 
 /**
@@ -25,7 +26,6 @@ import static io.github.k_tomaszewski.util.StreamUtil.closeSafely;
 class FileLinesSpliterator implements Spliterator<String>, AutoCloseable, ReadContext {
 
     private static final Logger LOG = LoggerFactory.getLogger(FileLinesSpliterator.class);
-    private static final BiPredicate<Path, BasicFileAttributes> IS_FILE_PREDICATE = (path, attributes) -> attributes.isRegularFile();
 
     final Stream<Path> pathStream;
     final Spliterator<Path> pathSpliterator;

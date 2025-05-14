@@ -29,6 +29,7 @@ import java.util.function.ToLongFunction;
 public class Database<T> extends ReadOnlyDatabase implements Closeable {
 
     public static final char NEW_LINE_CHAR = '\n';
+    private static final String MB_FORMAT = "%.3f MB";
 
     private static final Logger LOG = LoggerFactory.getLogger(Database.class);
     private static final int WRITES_TO_CHECK_DISK_USAGE = 10;
@@ -61,8 +62,8 @@ public class Database<T> extends ReadOnlyDatabase implements Closeable {
         var fileStoreOpt = getFileStore(dataDir);
         diskBlockSize = getBlockSize(fileStoreOpt);
 
-        LOG.info("Data directory: '{}'. Disk usage limit: {} MB. Disk usage: {} MB. File store type: {}. Block size: {} B.",
-                dataDir, diskUsageLimit, getActualDiskUsageMB(), fileStoreOpt.map(FileStore::type).orElse("?"),
+        LOG.info("Data directory: '{}'. Disk usage limit: {} MB. Disk usage: {}. File store type: {}. Block size: {} B.",
+                dataDir, diskUsageLimit, MB_FORMAT.formatted(getActualDiskUsageMB()), fileStoreOpt.map(FileStore::type).orElse("?"),
                 diskBlockSize);
 
         maxIdleSeconds = config.getFileMaxIdleTime().toSeconds();
@@ -153,7 +154,7 @@ public class Database<T> extends ReadOnlyDatabase implements Closeable {
                 final double leftDiskSpace = diskUsageLimit - diskUsageActual.sum();
                 final double minDiskSpace = getMinDiskSpace();
                 if (leftDiskSpace < minDiskSpace) {
-                    LOG.info("Left disk space below minimum: {} MB.", leftDiskSpace);
+                    LOG.info("Left disk space below minimum: {}.", MB_FORMAT.formatted(leftDiskSpace));
                     if (diskSpaceReclaiming.compareAndSet(false, true)) {
                         try {
                             Thread.ofVirtual().name("etdb-reclaim")

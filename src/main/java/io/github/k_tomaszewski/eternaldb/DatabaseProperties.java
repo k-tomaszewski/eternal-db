@@ -23,6 +23,7 @@ public class DatabaseProperties<T> {
     };
     private Duration fileMaxIdleTime = Duration.ofMinutes(5);
     private BooleanSupplier flushCondition;
+    private boolean createDirs = true;
 
     public DatabaseProperties() {
     }
@@ -106,5 +107,14 @@ public class DatabaseProperties<T> {
 
     public DatabaseProperties<T> withFlushOnEveryWrite() {
         return setFlushCondition(() -> true);
+    }
+
+    public boolean getCreateDirs() {
+        return createDirs;
+    }
+
+    public DatabaseProperties<T> setCreateDirs(boolean createDirs) {
+        this.createDirs = createDirs;
+        return this;
     }
 }

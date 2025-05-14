@@ -9,11 +9,15 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.util.function.BiPredicate;
 import java.util.stream.Stream;
 
 public class FileUtils {
 
     private static final Logger LOG = LoggerFactory.getLogger(FileUtils.class);
+
+    public static final BiPredicate<Path, BasicFileAttributes> IS_FILE_PREDICATE = (path, attributes) -> attributes.isRegularFile();
 
     public static boolean isEmptyDir(Path path) {
         try (Stream<Path> dirContentStream = Files.list(path)) {

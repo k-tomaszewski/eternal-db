@@ -50,13 +50,15 @@ NOTE: This project is a work-in-progress (WIP).
 
 ## Design decisions
 1. Project is developed in Java 21.
-2. Records are kept formatted as single line JSON, thus a single data file has a format similar to JSON Lines: https://jsonlines.org/
+2. Records are kept formatted as single line JSON each.
 3. Each line in a data file is beginning with timestamp being number of millis from the Epoch (as given by `System.currentTimeMillis()`)
-   and formatted with radix of 32 (to use less disk space), followed by the tab character, followed by JSON.
+   and formatted with radix of 32 (to use less disk space), followed by the tab character, followed by JSON one-liner.
 4. Unix line endings are used in data files, as it is only 1 byte and it makes it easier to detect corrupted file.
 5. Data are persisted as a disk files in directory tree that is representing periods of time.
 6. Project is avoiding unnecessary dependencies. No Vavr, Project Reactor, Guava, etc.
 7. The database should be easy to use in Spring Boot based application.
+8. By design there is no protection against improper use like two Eternal-db instances (class `Database`) writing independently using overlapping directories on disk. Just to keep it simple.
+9. A single Eternal-db database folder can be shared by multiple independently used read-only Eternal-db instances (class `ReadOnlyDatabase`).
 
 ## Usage
 ### Dependency
@@ -84,7 +86,7 @@ artifacts, so you need to have a GitHub account and you need to set up your cred
 - https://maven.apache.org/guides/mini/guide-deployment-security-settings.html
 - https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-apache-maven-registry#authenticating-with-a-personal-access-token
 
-### Opening a database
+### Opening a database for read-write access
 To use it you create a single object of class `io.github.k_tomaszewski.eternaldb.Database`.
 Such object gives access to operations on a single data store.
 
@@ -129,6 +131,29 @@ List<MyRecord> entities = db.read(MyRecord.class, fromMillis, null)
         .map(Timestamped::record).toList();
 ```
 Here the given type (`MyRecord.class` in the example above) is used for deserialization purpose.
+
+### Filtering
+The main data filter provided is a time-range, as described above. This can take following variants:
+- no time-range filtering: minMillis = null and maxMillis = null
+- open-ended time-range: minMillis = null or maxMillis = null
+- time-range filtering: minMillis and maxMillis are both not null
+
+Other means of filtering may be applied on a returned `java.util.Stream` using its [filter]( 
+https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/Stream.html#filter(java.util.function.Predicate) ) method.
+
+#### Counting
+You can use `java.util.Stream::count` method for counting.
+
+### Opening a database for read-only access
+You can use `ReadOnlyDatase` class instead of `Database` class to get a read-only access to your database.
+Actually `Database` class extends `ReadOnlyDatase` class by adding writing functionality.
+
+#### Reading database from a ZIP file
+After you have collected interesting data with Eternal DB you can decide to compress the whole database directory to a ZIP file.
+Later on you can get a read-only access to such ZIP-compressed database as follows:
+```java
+ReadOnlyDatabase roDb = ReadOnlyDatabase.fromZip(Path.of("your/db.zip"));
+```
 
 ### Closing a database
 After all interactions with the database are done, for example at the end of your program, 
